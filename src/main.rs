@@ -5,7 +5,7 @@ use std::os::unix::process::ExitStatusExt;
 use std::process::{Command, Output};
 use std::{env, process};
 
-fn main() {
+fn main() -> Result<(), io::Error> {
     let args: Vec<_> = env::args().collect();
     let program_name = args[0].clone();
     let mut opts = Options::new();
@@ -36,18 +36,19 @@ fn main() {
         process::exit(0);
     };
 
-    let cmd_output = run_cmd(&cmd_line);
-
-    let report = make_report(cmd_line, &cmd_output).unwrap();
+    let cmd_output = run_cmd(&cmd_line)?;
+    let report = make_report(cmd_line, &cmd_output)?;
 
     if let Some(file) = output_file {
-        let mut file = File::create(file).unwrap();
-        file.write_all(&report).unwrap();
+        let mut file = File::create(file)?;
+        file.write_all(&report)?;
     }
 
     if cmd_output.status.code() != Some(0) || !cmd_output.stderr.is_empty() {
         println!("{}", String::from_utf8_lossy(&report));
     }
+
+    Ok(())
 }
 
 fn print_usage(program: &str, opts: &Options) {
@@ -55,10 +56,10 @@ fn print_usage(program: &str, opts: &Options) {
     print!("{}", opts.usage(&brief));
 }
 
-fn run_cmd(cmd_line: &str) -> Output {
+fn run_cmd(cmd_line: &str) -> Result<Output, io::Error> {
     let mut cmd: Vec<&str> = cmd_line.split_whitespace().collect();
     let args = cmd.split_off(1);
-    Command::new(cmd[0]).args(&args).output().unwrap()
+    Command::new(cmd[0]).args(&args).output()
 }
 
 fn make_report(cmd_line: String, output: &Output) -> Result<Vec<u8>, io::Error> {
@@ -81,5 +82,6 @@ fn make_report(cmd_line: String, output: &Output) -> Result<Vec<u8>, io::Error> 
     writeln!(buf, "Stderr")?;
     writeln!(buf, "------")?;
     writeln!(buf, "{}", String::from_utf8_lossy(&output.stderr))?;
+
     Ok(buf)
 }

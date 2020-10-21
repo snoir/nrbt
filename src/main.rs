@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::{self, Write};
 use std::os::unix::process::ExitStatusExt;
 use std::process::{Command, Output};
+use std::time::{Duration, Instant};
 use std::{env, process};
 
 fn main() -> Result<(), io::Error> {
@@ -36,8 +37,10 @@ fn main() -> Result<(), io::Error> {
         process::exit(0);
     };
 
+    let start = Instant::now();
     let cmd_output = run_cmd(&cmd_line)?;
-    let report = make_report(cmd_line, &cmd_output)?;
+    let duration = start.elapsed();
+    let report = make_report(cmd_line, &cmd_output, &duration)?;
 
     if let Some(file) = output_file {
         let mut file = File::create(file)?;
@@ -62,7 +65,11 @@ fn run_cmd(cmd_line: &str) -> Result<Output, io::Error> {
     Command::new(cmd[0]).args(&args).output()
 }
 
-fn make_report(cmd_line: String, output: &Output) -> Result<Vec<u8>, io::Error> {
+fn make_report(
+    cmd_line: String,
+    output: &Output,
+    duration: &Duration,
+) -> Result<Vec<u8>, io::Error> {
     let mut buf: Vec<u8> = Vec::new();
     writeln!(buf, "Run of command: \"{}\"", cmd_line)?;
 
@@ -74,6 +81,8 @@ fn make_report(cmd_line: String, output: &Output) -> Result<Vec<u8>, io::Error> 
             output.status.signal().unwrap()
         )?,
     };
+
+    writeln!(buf, "\nDuration: {} seconds", duration.as_secs())?;
 
     writeln!(buf, "\nStdout")?;
     writeln!(buf, "------")?;

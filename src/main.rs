@@ -110,33 +110,38 @@ fn handle_cmd_error(mut cmd_return: &mut CmdReturn, error: io::Error) -> Result<
     Ok(())
 }
 
-fn run_cmd_with_precedent(
-    cmd_preced: &Cmd,
+fn run_cmd(
+    cmds: &[Cmd],
+    indice_current: usize,
     mut cmd_return: &mut CmdReturn,
-    cmd_current: &Cmd,
     mut child: Option<Child>,
 ) -> Result<(Run, Option<Child>), io::Error> {
+    let cmd_current = &cmds[indice_current];
+    let cmd_last = &cmds[indice_current - 1];
     let cmd_line = cmd_current.cmd_line;
     let mut cmd: Vec<&str> = cmd_line.split_whitespace().collect();
     let args = cmd.split_off(1);
-    match cmd_preced.kind {
-        CmdKind::SemiCol => {
-            let output = Command::new(cmd[0]).args(&args).output();
-            match output {
-                Ok(mut output) => {
-                    cmd_return.status = output.status.code();
-                    cmd_return.signal = output.status.signal();
-                    cmd_return.stderr.append(&mut output.stderr);
-                    cmd_return.stdout.append(&mut output.stdout);
-                }
-                Err(error) => handle_cmd_error(cmd_return, error)?,
-            };
+    let output = Command::new(cmd[0]).args(&args).output();
+    if cmd_current.kind == CmdKind::Pipe {
+        child = if let Some(child) = child {
+            Some(
+                Command::new(cmd[0])
+                    .args(&args)
+                    .stdin(child.stdout.unwrap())
+                    .stdout(Stdio::piped())
+                    .spawn()?,
+            )
+        } else {
+            Some(
+                Command::new(cmd[0])
+                    .args(&args)
+                    .stdout(Stdio::piped())
+                    .spawn()?,
+            )
         }
-        CmdKind::And => {
-            if let Some(1) = &cmd_return.status {
-                return Ok((Run::Abort, None));
-            } else {
-                let output = Command::new(cmd[0]).args(&args).output();
+    } else {
+        match cmd_last.kind {
+            CmdKind::SemiCol => {
                 match output {
                     Ok(mut output) => {
                         cmd_return.status = output.status.code();
@@ -147,34 +152,39 @@ fn run_cmd_with_precedent(
                     Err(error) => handle_cmd_error(cmd_return, error)?,
                 };
             }
-        }
-        CmdKind::Pipe => {
-            if cmd_current.kind == CmdKind::Pipe {
-                child = Some(
-                    Command::new(cmd[0])
-                        .args(&args)
-                        .stdin(child.unwrap().stdout.unwrap())
-                        .stdout(Stdio::piped())
-                        .spawn()?,
-                );
-            } else {
+            CmdKind::And => {
+                if let Some(1) = &cmd_return.status {
+                    return Ok((Run::Abort, None));
+                } else {
+                    match output {
+                        Ok(mut output) => {
+                            cmd_return.status = output.status.code();
+                            cmd_return.signal = output.status.signal();
+                            cmd_return.stderr.append(&mut output.stderr);
+                            cmd_return.stdout.append(&mut output.stdout);
+                        }
+                        Err(error) => handle_cmd_error(cmd_return, error)?,
+                    };
+                }
+            }
+            CmdKind::Pipe => {
                 let output = Command::new(cmd[0])
                     .args(&args)
                     .stdin(child.unwrap().stdout.unwrap())
                     .output();
                 child = None;
                 match output {
-                    Ok(output) => {
+                    Ok(mut output) => {
                         cmd_return.status = output.status.code();
                         cmd_return.signal = output.status.signal();
-                        cmd_return.stderr = output.stderr;
-                        cmd_return.stdout = output.stdout;
+                        cmd_return.stderr.append(&mut output.stderr);
+                        cmd_return.stdout.append(&mut output.stdout);
                     }
                     Err(error) => handle_cmd_error(cmd_return, error)?,
                 };
             }
+            _ => panic!("Not supported!"),
         }
-        _ => panic!("Not supported!"),
     }
 
     Ok((Run::Continue, child))
@@ -191,8 +201,7 @@ fn run_all_cmd(cmds: Vec<Cmd>) -> Result<CmdReturn, io::Error> {
 
     for (i, cmd) in cmds.iter().enumerate() {
         if i > 0 {
-            let (run, child_new) =
-                run_cmd_with_precedent(&cmds[i - 1], &mut cmd_return, cmd, child)?;
+            let (run, child_new) = run_cmd(&cmds, i, &mut cmd_return, child)?;
             child = child_new;
             if run == Run::Abort {
                 break;

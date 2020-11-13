@@ -88,6 +88,27 @@ fn print_usage(program: &str, opts: &Options) {
     print!("{}", opts.usage(&brief));
 }
 
+fn handle_cmd_error(mut cmd_return: &mut CmdReturn, error: io::Error) -> Result<(), io::Error> {
+    match error.kind() {
+        ErrorKind::NotFound => {
+            cmd_return.status = Some(127);
+            cmd_return.signal = None;
+            cmd_return
+                .stderr
+                .append(&mut b"nrbt: command not found".to_vec());
+        }
+        ErrorKind::PermissionDenied => {
+            cmd_return.status = Some(126);
+            cmd_return.signal = None;
+            cmd_return
+                .stderr
+                .append(&mut b"nrbt: permission denied".to_vec());
+        }
+        _ => return Err(error),
+    }
+    Ok(())
+}
+
 fn run_cmd_with_precedent(
     cmd_preced: &Cmd,
     mut cmd_return: &mut CmdReturn,
@@ -105,23 +126,7 @@ fn run_cmd_with_precedent(
                     cmd_return.stderr.append(&mut output.stderr);
                     cmd_return.stdout.append(&mut output.stdout);
                 }
-                Err(error) => match error.kind() {
-                    ErrorKind::NotFound => {
-                        cmd_return.status = Some(127);
-                        cmd_return.signal = None;
-                        cmd_return
-                            .stderr
-                            .append(&mut b"nrbt: command not found".to_vec())
-                    }
-                    ErrorKind::PermissionDenied => {
-                        cmd_return.status = Some(126);
-                        cmd_return.signal = None;
-                        cmd_return
-                            .stderr
-                            .append(&mut b"nrbt: permission denied".to_vec())
-                    }
-                    _ => return Err(error),
-                },
+                Err(error) => handle_cmd_error(cmd_return, error)?,
             };
         }
         CmdKind::And => {
@@ -136,23 +141,7 @@ fn run_cmd_with_precedent(
                         cmd_return.stderr.append(&mut output.stderr);
                         cmd_return.stdout.append(&mut output.stdout);
                     }
-                    Err(error) => match error.kind() {
-                        ErrorKind::NotFound => {
-                            cmd_return.status = Some(127);
-                            cmd_return.signal = None;
-                            cmd_return
-                                .stderr
-                                .append(&mut b"nrbt: command not found".to_vec())
-                        }
-                        ErrorKind::PermissionDenied => {
-                            cmd_return.status = Some(126);
-                            cmd_return.signal = None;
-                            cmd_return
-                                .stderr
-                                .append(&mut b"nrbt: permission denied".to_vec())
-                        }
-                        _ => return Err(error),
-                    },
+                    Err(error) => handle_cmd_error(cmd_return, error)?,
                 };
             }
         }
@@ -180,28 +169,14 @@ fn run_all_cmd(cmds: Vec<Cmd>) -> Result<CmdReturn, io::Error> {
             let mut cmd_vec: Vec<&str> = cmd.cmd_line.split_whitespace().collect();
             let args = cmd_vec.split_off(1);
             let output = Command::new(cmd_vec[0]).args(&args).output();
-            cmd_return = match output {
-                Ok(output) => CmdReturn {
-                    status: output.status.code(),
-                    signal: output.status.signal(),
-                    stderr: output.stderr,
-                    stdout: output.stdout,
-                },
-                Err(error) => match error.kind() {
-                    ErrorKind::NotFound => CmdReturn {
-                        status: Some(127),
-                        signal: None,
-                        stderr: b"nrbt: command not found".to_vec(),
-                        stdout: [].to_vec(),
-                    },
-                    ErrorKind::PermissionDenied => CmdReturn {
-                        status: Some(126),
-                        signal: None,
-                        stderr: b"nrbt: permission denied".to_vec(),
-                        stdout: [].to_vec(),
-                    },
-                    _ => return Err(error),
-                },
+            match output {
+                Ok(output) => {
+                    cmd_return.status = output.status.code();
+                    cmd_return.signal = output.status.signal();
+                    cmd_return.stderr = output.stderr;
+                    cmd_return.stdout = output.stdout;
+                }
+                Err(error) => handle_cmd_error(&mut cmd_return, error)?,
             };
         }
     }

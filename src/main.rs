@@ -1,13 +1,14 @@
 use getopts::Options;
 use regex::Regex;
+use std::env;
 use std::fs::File;
 use std::io::{self, ErrorKind, Write};
 use std::os::unix::process::ExitStatusExt;
 use std::process::Command;
+use std::process::{self, Child, Stdio};
 use std::time::{Duration, Instant};
-use std::{env, process};
 
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 enum CmdKind {
     Single,
     Pipe,
@@ -112,8 +113,10 @@ fn handle_cmd_error(mut cmd_return: &mut CmdReturn, error: io::Error) -> Result<
 fn run_cmd_with_precedent(
     cmd_preced: &Cmd,
     mut cmd_return: &mut CmdReturn,
-    cmd_line: &str,
-) -> Result<Run, io::Error> {
+    cmd_current: &Cmd,
+    mut child: Option<Child>,
+) -> Result<(Run, Option<Child>), io::Error> {
+    let cmd_line = cmd_current.cmd_line;
     let mut cmd: Vec<&str> = cmd_line.split_whitespace().collect();
     let args = cmd.split_off(1);
     match cmd_preced.kind {
@@ -131,7 +134,7 @@ fn run_cmd_with_precedent(
         }
         CmdKind::And => {
             if let Some(1) = &cmd_return.status {
-                return Ok(Run::Abort);
+                return Ok((Run::Abort, None));
             } else {
                 let output = Command::new(cmd[0]).args(&args).output();
                 match output {
@@ -145,10 +148,36 @@ fn run_cmd_with_precedent(
                 };
             }
         }
+        CmdKind::Pipe => {
+            if cmd_current.kind == CmdKind::Pipe {
+                child = Some(
+                    Command::new(cmd[0])
+                        .args(&args)
+                        .stdin(child.unwrap().stdout.unwrap())
+                        .stdout(Stdio::piped())
+                        .spawn()?,
+                );
+            } else {
+                let output = Command::new(cmd[0])
+                    .args(&args)
+                    .stdin(child.unwrap().stdout.unwrap())
+                    .output();
+                child = None;
+                match output {
+                    Ok(output) => {
+                        cmd_return.status = output.status.code();
+                        cmd_return.signal = output.status.signal();
+                        cmd_return.stderr = output.stderr;
+                        cmd_return.stdout = output.stdout;
+                    }
+                    Err(error) => handle_cmd_error(cmd_return, error)?,
+                };
+            }
+        }
         _ => panic!("Not supported!"),
     }
 
-    Ok(Run::Continue)
+    Ok((Run::Continue, child))
 }
 
 fn run_all_cmd(cmds: Vec<Cmd>) -> Result<CmdReturn, io::Error> {
@@ -158,26 +187,38 @@ fn run_all_cmd(cmds: Vec<Cmd>) -> Result<CmdReturn, io::Error> {
         stderr: [].to_vec(),
         stdout: [].to_vec(),
     };
+    let mut child: Option<Child> = None;
 
     for (i, cmd) in cmds.iter().enumerate() {
         if i > 0 {
-            let run = run_cmd_with_precedent(&cmds[i - 1], &mut cmd_return, cmd.cmd_line)?;
+            let (run, child_new) =
+                run_cmd_with_precedent(&cmds[i - 1], &mut cmd_return, cmd, child)?;
+            child = child_new;
             if run == Run::Abort {
                 break;
             }
         } else {
             let mut cmd_vec: Vec<&str> = cmd.cmd_line.split_whitespace().collect();
             let args = cmd_vec.split_off(1);
-            let output = Command::new(cmd_vec[0]).args(&args).output();
-            match output {
-                Ok(output) => {
-                    cmd_return.status = output.status.code();
-                    cmd_return.signal = output.status.signal();
-                    cmd_return.stderr = output.stderr;
-                    cmd_return.stdout = output.stdout;
-                }
-                Err(error) => handle_cmd_error(&mut cmd_return, error)?,
-            };
+            if cmd.kind == CmdKind::Pipe {
+                child = Some(
+                    Command::new(cmd_vec[0])
+                        .args(&args)
+                        .stdout(Stdio::piped())
+                        .spawn()?,
+                );
+            } else {
+                let output = Command::new(cmd_vec[0]).args(&args).output();
+                match output {
+                    Ok(output) => {
+                        cmd_return.status = output.status.code();
+                        cmd_return.signal = output.status.signal();
+                        cmd_return.stderr = output.stderr;
+                        cmd_return.stdout = output.stdout;
+                    }
+                    Err(error) => handle_cmd_error(&mut cmd_return, error)?,
+                };
+            }
         }
     }
 

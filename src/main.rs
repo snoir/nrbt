@@ -1,3 +1,4 @@
+use chrono::prelude::*;
 use getopts::Options;
 use regex::Regex;
 use std::env;
@@ -68,9 +69,11 @@ fn main() -> Result<(), io::Error> {
     };
 
     let start = Instant::now();
+    let start_time = Local::now();
     let run = run_all_cmd(parse_cmd_line(&cmd_line))?;
+    let end_time = Local::now();
     let duration = start.elapsed();
-    let report = make_report(cmd_line, &run, &duration)?;
+    let report = make_report(cmd_line, &run, &duration, start_time, end_time)?;
 
     if let Some(file) = output_file {
         let mut file = File::create(file)?;
@@ -259,6 +262,8 @@ fn make_report(
     cmd_line: String,
     cmd_return: &CmdReturn,
     duration: &Duration,
+    start_time: DateTime<Local>,
+    end_time: DateTime<Local>,
 ) -> Result<Vec<u8>, io::Error> {
     let mut buf: Vec<u8> = Vec::new();
     writeln!(buf, "Run of command: \"{}\"", cmd_line)?;
@@ -273,6 +278,8 @@ fn make_report(
     }
 
     writeln!(buf, "\nDuration: {} seconds", duration.as_secs())?;
+    writeln!(buf, "Started at: {}", start_time.to_rfc2822())?;
+    writeln!(buf, "Ended at: {}", end_time.to_rfc2822())?;
 
     writeln!(buf, "\nStdout")?;
     writeln!(buf, "------")?;

@@ -99,21 +99,27 @@ fn handle_cmd_output(cmd_return: &mut CmdReturn, output: &mut Output) {
     cmd_return.stdout.append(&mut output.stdout);
 }
 
-fn handle_cmd_error(cmd_return: &mut CmdReturn, error: io::Error) -> Result<(), io::Error> {
+fn handle_cmd_error(
+    cmd_return: &mut CmdReturn,
+    cmd: &str,
+    error: io::Error,
+) -> Result<(), io::Error> {
     match error.kind() {
         ErrorKind::NotFound => {
+            let error_line = format!("nrbt: command not found: {}", cmd);
             cmd_return.status = Some(127);
             cmd_return.signal = None;
             cmd_return
                 .stderr
-                .append(&mut b"nrbt: command not found".to_vec());
+                .append(&mut error_line.as_bytes().to_vec());
         }
         ErrorKind::PermissionDenied => {
+            let error_line = format!("nrbt: permission denied: {}", cmd);
             cmd_return.status = Some(126);
             cmd_return.signal = None;
             cmd_return
                 .stderr
-                .append(&mut b"nrbt: permission denied".to_vec());
+                .append(&mut error_line.as_bytes().to_vec());
         }
         _ => return Err(error),
     }
@@ -123,7 +129,7 @@ fn handle_cmd_error(cmd_return: &mut CmdReturn, error: io::Error) -> Result<(), 
 fn run_cmd(
     cmds: &[Cmd],
     indice_current: usize,
-    mut cmd_return: &mut CmdReturn,
+    cmd_return: &mut CmdReturn,
     mut child: Option<Child>,
 ) -> Result<(Run, Option<Child>), io::Error> {
     let cmd_current = &cmds[indice_current];
@@ -147,7 +153,7 @@ fn run_cmd(
         child = match child_new {
             Ok(child) => Some(child),
             Err(error) => {
-                handle_cmd_error(cmd_return, error)?;
+                handle_cmd_error(cmd_return, &cmd[0], error)?;
                 None
             }
         };
@@ -159,7 +165,7 @@ fn run_cmd(
                 CmdKind::SemiCol => {
                     match output {
                         Ok(mut output) => handle_cmd_output(cmd_return, &mut output),
-                        Err(error) => handle_cmd_error(cmd_return, error)?,
+                        Err(error) => handle_cmd_error(cmd_return, &cmd[0], error)?,
                     };
                 }
                 CmdKind::And => {
@@ -168,7 +174,7 @@ fn run_cmd(
                     } else {
                         match output {
                             Ok(mut output) => handle_cmd_output(cmd_return, &mut output),
-                            Err(error) => handle_cmd_error(cmd_return, error)?,
+                            Err(error) => handle_cmd_error(cmd_return, &cmd[0], error)?,
                         };
                     }
                 }
@@ -184,7 +190,7 @@ fn run_cmd(
                     child = None;
                     match output {
                         Ok(mut output) => handle_cmd_output(cmd_return, &mut output),
-                        Err(error) => handle_cmd_error(cmd_return, error)?,
+                        Err(error) => handle_cmd_error(cmd_return, &cmd[0], error)?,
                     };
                 }
                 _ => panic!("Not supported!"),
@@ -192,7 +198,7 @@ fn run_cmd(
         } else {
             match output {
                 Ok(mut output) => handle_cmd_output(cmd_return, &mut output),
-                Err(error) => handle_cmd_error(&mut cmd_return, error)?,
+                Err(error) => handle_cmd_error(cmd_return, &cmd[0], error)?,
             };
         }
     }

@@ -170,10 +170,14 @@ fn run_cmd(
                     }
                 }
                 CmdKind::Pipe => {
-                    let output = Command::new(cmd[0])
-                        .args(&args)
-                        .stdin(child.unwrap().stdout.unwrap())
-                        .output();
+                    let output = if let Some(child) = child {
+                        Command::new(cmd[0])
+                            .args(&args)
+                            .stdin(child.stdout.unwrap())
+                            .output()
+                    } else {
+                        Command::new(cmd[0]).args(&args).output()
+                    };
                     child = None;
                     match output {
                         Ok(mut output) => handle_cmd_output(cmd_return, &mut output),

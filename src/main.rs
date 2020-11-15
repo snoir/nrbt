@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io::{self, ErrorKind, Write};
 use std::os::unix::process::ExitStatusExt;
 use std::process::Command;
-use std::process::{self, Child, Stdio};
+use std::process::{self, Child, Output, Stdio};
 use std::time::{Duration, Instant};
 
 #[derive(PartialEq, Debug)]
@@ -89,7 +89,14 @@ fn print_usage(program: &str, opts: &Options) {
     print!("{}", opts.usage(&brief));
 }
 
-fn handle_cmd_error(mut cmd_return: &mut CmdReturn, error: io::Error) -> Result<(), io::Error> {
+fn handle_cmd_output(cmd_return: &mut CmdReturn, output: &mut Output) {
+    cmd_return.status = output.status.code();
+    cmd_return.signal = output.status.signal();
+    cmd_return.stderr.append(&mut output.stderr);
+    cmd_return.stdout.append(&mut output.stdout);
+}
+
+fn handle_cmd_error(cmd_return: &mut CmdReturn, error: io::Error) -> Result<(), io::Error> {
     match error.kind() {
         ErrorKind::NotFound => {
             cmd_return.status = Some(127);
@@ -148,12 +155,7 @@ fn run_cmd(
             match cmd_last.kind {
                 CmdKind::SemiCol => {
                     match output {
-                        Ok(mut output) => {
-                            cmd_return.status = output.status.code();
-                            cmd_return.signal = output.status.signal();
-                            cmd_return.stderr.append(&mut output.stderr);
-                            cmd_return.stdout.append(&mut output.stdout);
-                        }
+                        Ok(mut output) => handle_cmd_output(cmd_return, &mut output),
                         Err(error) => handle_cmd_error(cmd_return, error)?,
                     };
                 }
@@ -162,12 +164,7 @@ fn run_cmd(
                         return Ok((Run::Abort, None));
                     } else {
                         match output {
-                            Ok(mut output) => {
-                                cmd_return.status = output.status.code();
-                                cmd_return.signal = output.status.signal();
-                                cmd_return.stderr.append(&mut output.stderr);
-                                cmd_return.stdout.append(&mut output.stdout);
-                            }
+                            Ok(mut output) => handle_cmd_output(cmd_return, &mut output),
                             Err(error) => handle_cmd_error(cmd_return, error)?,
                         };
                     }
@@ -179,12 +176,7 @@ fn run_cmd(
                         .output();
                     child = None;
                     match output {
-                        Ok(mut output) => {
-                            cmd_return.status = output.status.code();
-                            cmd_return.signal = output.status.signal();
-                            cmd_return.stderr.append(&mut output.stderr);
-                            cmd_return.stdout.append(&mut output.stdout);
-                        }
+                        Ok(mut output) => handle_cmd_output(cmd_return, &mut output),
                         Err(error) => handle_cmd_error(cmd_return, error)?,
                     };
                 }
@@ -192,12 +184,7 @@ fn run_cmd(
             }
         } else {
             match output {
-                Ok(mut output) => {
-                    cmd_return.status = output.status.code();
-                    cmd_return.signal = output.status.signal();
-                    cmd_return.stderr.append(&mut output.stderr);
-                    cmd_return.stdout.append(&mut output.stdout);
-                }
+                Ok(mut output) => handle_cmd_output(cmd_return, &mut output),
                 Err(error) => handle_cmd_error(&mut cmd_return, error)?,
             };
         }

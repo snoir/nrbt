@@ -47,7 +47,7 @@ fn main() -> Result<(), io::Error> {
         "Write stdout and stderr in a file",
         "PATH",
     );
-    opts.optmulti("m", "match", "Match for regex inside stdout", "EXPR");
+    //opts.optmulti("m", "match", "Match for regex inside stdout", "EXPR");
     opts.optflag("h", "help", "print this help menu");
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -55,7 +55,7 @@ fn main() -> Result<(), io::Error> {
     };
 
     let output_file = matches.opt_str("o");
-    let _match_regex = matches.opt_strs("m");
+    //let _match_regex = matches.opt_strs("m");
     if matches.opt_present("h") {
         print_usage(&program_name, &opts);
         process::exit(0);

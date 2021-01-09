@@ -13,4 +13,6 @@ ended well).
 
 ## Example
 
- # nrbt myscript.sh -o /var/log/myscript.log
+```
+ % nrbt myscript.sh -o /var/log/myscript.log
+```

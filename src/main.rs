@@ -48,6 +48,7 @@ fn main() -> Result<(), io::Error> {
         "PATH",
     );
     //opts.optmulti("m", "match", "Match for regex inside stdout", "EXPR");
+    opts.optmulti("e", "error-code", "Allowed error code", "CODE");
     opts.optflag("h", "help", "print this help menu");
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -55,6 +56,7 @@ fn main() -> Result<(), io::Error> {
     };
 
     let output_file = matches.opt_str("o");
+    let error_codes = matches.opt_strs("e");
     //let _match_regex = matches.opt_strs("m");
     if matches.opt_present("h") {
         print_usage(&program_name, &opts);
@@ -80,7 +82,9 @@ fn main() -> Result<(), io::Error> {
         file.write_all(&report)?;
     }
 
-    if run.status != Some(0) || !run.stderr.is_empty() {
+    if (run.status != Some(0) && !error_codes.contains(&run.status.unwrap().to_string()))
+        || !run.stderr.is_empty()
+    {
         println!("{}", String::from_utf8_lossy(&report));
     }
 

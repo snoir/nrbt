@@ -48,7 +48,12 @@ fn main() -> Result<(), io::Error> {
         "PATH",
     );
     //opts.optmulti("m", "match", "Match for regex inside stdout", "EXPR");
-    opts.optmulti("e", "error-code", "Allowed error code", "CODE");
+    opts.optmulti(
+        "e",
+        "error-code",
+        "Report will not be printed on stdout when ending with specified code",
+        "CODE",
+    );
     opts.optflag("h", "help", "print this help menu");
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,

@@ -9,7 +9,7 @@ use std::process::Command;
 use std::process::{self, Child, Output, Stdio};
 use std::time::{Duration, Instant};
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq)]
 enum CmdKind {
     Single,
     Pipe,
@@ -17,13 +17,11 @@ enum CmdKind {
     SemiCol,
 }
 
-#[derive(Debug)]
 struct Cmd<'a> {
     kind: CmdKind,
     cmd_line: &'a str,
 }
 
-#[derive(Debug)]
 struct CmdReturn {
     status: Option<i32>,
     signal: Option<i32>,

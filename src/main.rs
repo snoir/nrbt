@@ -42,17 +42,18 @@ fn main() -> Result<(), io::Error> {
     opts.optopt(
         "o",
         "output-file",
-        "Write stdout and stderr in a file",
+        "Write stdout and stderr in a file.",
         "PATH",
     );
     //opts.optmulti("m", "match", "Match for regex inside stdout", "EXPR");
     opts.optmulti(
         "e",
         "error-code",
-        "Report will not be printed on stdout when ending with specified code",
+        "Report will not be printed on stdout when ending with specified code. \
+         Can be specified multiple times.",
         "CODE",
     );
-    opts.optflag("h", "help", "print this help menu");
+    opts.optflag("h", "help", "Print this help menu.");
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
         Err(f) => panic!(f.to_string()),

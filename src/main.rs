@@ -1,6 +1,6 @@
 use chrono::prelude::*;
 use getopts::Options;
-use regex::Regex;
+use regex::{Regex, RegexSet};
 use std::env;
 use std::fs::File;
 use std::io::{self, ErrorKind, Write};
@@ -46,11 +46,11 @@ fn main() -> Result<(), io::Error> {
         "Write stdout and stderr in a file.",
         "PATH",
     );
-    opts.optopt(
+    opts.optmulti(
         "r",
         "stderr-match",
         "Match for regex inside stderr. Report will not be printed if there is a \
-         match.",
+         match. Can be specified multiple times",
         "EXPR",
     );
     opts.optmulti(
@@ -68,7 +68,7 @@ fn main() -> Result<(), io::Error> {
 
     let output_file = matches.opt_str("o");
     let error_codes = matches.opt_strs("e");
-    let stderr_match_expr = matches.opt_str("r");
+    let stderr_match_exprs = matches.opt_strs("r");
     if matches.opt_present("h") {
         print_usage(&program_name, &opts);
         process::exit(0);
@@ -89,9 +89,9 @@ fn main() -> Result<(), io::Error> {
     let report = make_report(cmd_line, &run, &duration, start_time, end_time)?;
     let mut stderr_matches_regex = false;
 
-    if let Some(stderr_match_expr) = stderr_match_expr {
-        let stderr_match_re = Regex::new(&stderr_match_expr).unwrap();
-        stderr_matches_regex = stderr_match_re.is_match(str::from_utf8(&run.stderr).unwrap());
+    if stderr_match_exprs.len() > 0 {
+        let stderr_match_re_set = RegexSet::new(&stderr_match_exprs).unwrap();
+        stderr_matches_regex = stderr_match_re_set.is_match(str::from_utf8(&run.stderr).unwrap());
     }
 
     if let Some(file) = output_file {

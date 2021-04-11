@@ -68,7 +68,7 @@ fn main() -> Result<(), io::Error> {
 
     let output_file = matches.opt_str("o");
     let error_codes = matches.opt_strs("e");
-    let stderr_match = matches.opt_str("r");
+    let stderr_match_expr = matches.opt_str("r");
     if matches.opt_present("h") {
         print_usage(&program_name, &opts);
         process::exit(0);
@@ -89,8 +89,8 @@ fn main() -> Result<(), io::Error> {
     let report = make_report(cmd_line, &run, &duration, start_time, end_time)?;
     let mut stderr_matches_regex = false;
 
-    if let Some(stderr_match) = stderr_match {
-        let stderr_match_re = Regex::new(&stderr_match).unwrap();
+    if let Some(stderr_match_expr) = stderr_match_expr {
+        let stderr_match_re = Regex::new(&stderr_match_expr).unwrap();
         stderr_matches_regex = stderr_match_re.is_match(str::from_utf8(&run.stderr).unwrap());
     }
 

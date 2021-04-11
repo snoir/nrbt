@@ -89,7 +89,7 @@ fn main() -> Result<(), io::Error> {
     let report = make_report(cmd_line, &run, &duration, start_time, end_time)?;
     let mut stderr_matches_regex = false;
 
-    if stderr_match_exprs.len() > 0 {
+    if !stderr_match_exprs.is_empty() {
         let stderr_match_re_set = RegexSet::new(&stderr_match_exprs).unwrap();
         stderr_matches_regex = stderr_match_re_set.is_match(str::from_utf8(&run.stderr).unwrap());
     }

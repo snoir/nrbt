@@ -63,7 +63,7 @@ fn main() -> Result<(), io::Error> {
     opts.optflag("h", "help", "Print this help menu.");
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
-        Err(f) => panic!(f.to_string()),
+        Err(f) => panic!("{}", f.to_string()),
     };
 
     let output_file = matches.opt_str("o");

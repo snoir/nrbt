@@ -3,7 +3,8 @@
 nrbt is a tool to wrap commands and scripts launched via cron. It goals
 is to provide an output only if:
 * stderr was not empty
-* the process exit with a code other than 0
+* the process exit with a code other than 0 (it is possible to add "valid" exit
+codes using the `-e` option).
 
 If such cases happen, a simple report will be printed on stdout so cron can
 send it at the address configured in the `MAILTO` variable.

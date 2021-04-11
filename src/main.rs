@@ -7,6 +7,7 @@ use std::io::{self, ErrorKind, Write};
 use std::os::unix::process::ExitStatusExt;
 use std::process::Command;
 use std::process::{self, Child, Output, Stdio};
+use std::str;
 use std::time::{Duration, Instant};
 
 #[derive(PartialEq)]
@@ -45,7 +46,13 @@ fn main() -> Result<(), io::Error> {
         "Write stdout and stderr in a file.",
         "PATH",
     );
-    //opts.optmulti("m", "match", "Match for regex inside stdout", "EXPR");
+    opts.optopt(
+        "r",
+        "stderr-match",
+        "Match for regex inside stderr. Report will not be printed if there is a \
+         match.",
+        "EXPR",
+    );
     opts.optmulti(
         "e",
         "error-code",
@@ -61,7 +68,7 @@ fn main() -> Result<(), io::Error> {
 
     let output_file = matches.opt_str("o");
     let error_codes = matches.opt_strs("e");
-    //let _match_regex = matches.opt_strs("m");
+    let stderr_match = matches.opt_str("r");
     if matches.opt_present("h") {
         print_usage(&program_name, &opts);
         process::exit(0);
@@ -80,14 +87,21 @@ fn main() -> Result<(), io::Error> {
     let end_time = Local::now();
     let duration = start.elapsed();
     let report = make_report(cmd_line, &run, &duration, start_time, end_time)?;
+    let mut stderr_matches_regex = false;
+
+    if let Some(stderr_match) = stderr_match {
+        let stderr_match_re = Regex::new(&stderr_match).unwrap();
+        stderr_matches_regex = stderr_match_re.is_match(str::from_utf8(&run.stderr).unwrap());
+    }
 
     if let Some(file) = output_file {
         let mut file = File::create(file)?;
         file.write_all(&report)?;
     }
 
-    if (run.status != Some(0) && !error_codes.contains(&run.status.unwrap().to_string()))
-        || !run.stderr.is_empty()
+    if ((run.status != Some(0) && !error_codes.contains(&run.status.unwrap().to_string()))
+        || !run.stderr.is_empty())
+        && !stderr_matches_regex
     {
         println!("{}", String::from_utf8_lossy(&report));
     }

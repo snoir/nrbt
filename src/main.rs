@@ -54,6 +54,13 @@ fn main() -> Result<(), io::Error> {
         "EXPR",
     );
     opts.optmulti(
+        "u",
+        "stdout-match",
+        "Match for regex inside stdout. Report will not be printed if there is a \
+         match. Can be specified multiple times",
+        "EXPR",
+    );
+    opts.optmulti(
         "e",
         "error-code",
         "Report will not be printed on stdout when ending with specified code. \
@@ -69,6 +76,7 @@ fn main() -> Result<(), io::Error> {
     let output_file = matches.opt_str("o");
     let error_codes = matches.opt_strs("e");
     let stderr_match_exprs = matches.opt_strs("r");
+    let stdout_match_exprs = matches.opt_strs("u");
     if matches.opt_present("h") {
         print_usage(&program_name, &opts);
         process::exit(0);
@@ -88,10 +96,16 @@ fn main() -> Result<(), io::Error> {
     let duration = start.elapsed();
     let report = make_report(cmd_line, &run, &duration, start_time, end_time)?;
     let mut stderr_matches_regex = false;
+    let mut stdout_matches_regex = false;
 
     if !stderr_match_exprs.is_empty() {
         let stderr_match_re_set = RegexSet::new(&stderr_match_exprs).unwrap();
         stderr_matches_regex = stderr_match_re_set.is_match(str::from_utf8(&run.stderr).unwrap());
+    }
+
+    if !stdout_match_exprs.is_empty() {
+        let stdout_match_re_set = RegexSet::new(&stdout_match_exprs).unwrap();
+        stdout_matches_regex = stdout_match_re_set.is_match(str::from_utf8(&run.stdout).unwrap());
     }
 
     if let Some(file) = output_file {
@@ -101,7 +115,7 @@ fn main() -> Result<(), io::Error> {
 
     if ((run.status != Some(0) && !error_codes.contains(&run.status.unwrap().to_string()))
         || !run.stderr.is_empty())
-        && !stderr_matches_regex
+        && (!stderr_matches_regex && !stdout_matches_regex)
     {
         println!("{}", String::from_utf8_lossy(&report));
     }

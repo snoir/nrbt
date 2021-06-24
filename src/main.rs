@@ -263,7 +263,7 @@ fn run_all_cmd(cmds: Vec<Cmd>) -> Result<CmdReturn, io::Error> {
 }
 
 fn parse_cmd_line(cmd_line: &str) -> Vec<Cmd> {
-    let cmd_line_re = Regex::new(r"\s*([^(&{2}|;|\|)]+)(&{2}|;|\|)?").unwrap();
+    let cmd_line_re = Regex::new(r"\s*([^&{2}|;|\|]+)(&{2}|;|\|)?").unwrap();
 
     cmd_line_re
         .captures_iter(cmd_line)

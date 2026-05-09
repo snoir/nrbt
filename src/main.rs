@@ -262,7 +262,7 @@ fn run_all_cmd(cmds: Vec<Cmd>) -> Result<CmdReturn, io::Error> {
     Ok(cmd_return)
 }
 
-fn parse_cmd_line(cmd_line: &str) -> Vec<Cmd> {
+fn parse_cmd_line(cmd_line: &str) -> Vec<Cmd<'_>> {
     let cmd_line_re = Regex::new(r"\s*([^&{2}|;|\|]+)(&{2}|;|\|)?").unwrap();
 
     cmd_line_re
